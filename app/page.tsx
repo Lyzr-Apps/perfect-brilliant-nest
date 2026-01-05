@@ -355,105 +355,140 @@ Requirements: ${requirements}`
         }),
       })
 
-      const data = await res.json()
+      // Check if response is ok
+      if (!res.ok) {
+        throw new Error(`Server error: ${res.status} ${res.statusText}`)
+      }
+
+      let data: any
+      try {
+        data = await res.json()
+      } catch (jsonErr) {
+        const text = await res.text()
+        console.error('JSON parsing failed. Raw response:', text)
+        throw new Error(`Failed to parse server response: ${jsonErr instanceof Error ? jsonErr.message : 'Invalid JSON'}`)
+      }
 
       // Check if response exists and is valid
       if (!data) {
         throw new Error('Empty response received from server')
       }
 
-      // Handle success response
-      if (data.success && (data.response || data.result)) {
-        try {
-          // Extract the actual response object - try multiple locations
-          let responseData = data.response || data.result || data
+      // Extract policy data from response - handle various formats
+      let result: any = null
 
-          // Navigate through nested structures
-          let orchestratorResult = responseData
-
-          // If we have a 'result' property, use it
-          if (responseData.result && typeof responseData.result === 'object') {
-            orchestratorResult = responseData.result
-          }
-
-          // Handle policy document
-          let policyDocument = orchestratorResult.policy_document || orchestratorResult
-          if (!policyDocument.title && orchestratorResult.title) {
-            policyDocument = { title: orchestratorResult.title, sections: orchestratorResult.sections }
-          }
-
-          // Extract and normalize sections
-          let sections: string[] = []
-          if (policyDocument.sections) {
-            if (Array.isArray(policyDocument.sections)) {
-              sections = policyDocument.sections
-                .map((s: any) => (typeof s === 'string' ? s : JSON.stringify(s)))
-                .filter((s: string) => s && s.trim())
-            } else if (typeof policyDocument.sections === 'string') {
-              sections = [policyDocument.sections]
-            }
-          }
-
-          // Ensure we have at least some sections
-          if (sections.length === 0) {
-            sections = ['Policy content has been generated. Please review the compliance analysis for details.']
-          }
-
-          // Extract compliance data from multiple possible locations
-          let complianceData = orchestratorResult.compliance_analysis || {}
-          if (!complianceData.us_score && orchestratorResult.us_score) {
-            complianceData = {
-              us_score: orchestratorResult.us_score,
-              india_score: orchestratorResult.india_score,
-              critical_issues: orchestratorResult.critical_issues,
-              key_recommendations: orchestratorResult.key_recommendations,
-            }
-          }
-
-          // Extract scores with fallback
-          const us_score =
-            complianceData.us_score ||
-            complianceData.us_compliance_score ||
-            orchestratorResult.us_score ||
-            75
-          const india_score =
-            complianceData.india_score ||
-            complianceData.india_compliance_score ||
-            orchestratorResult.india_score ||
-            80
-
-          // Structure the final policy data
-          const policyData = {
-            title: policyDocument.title || topic,
-            sections: sections,
-            summary:
-              policyDocument.summary ||
-              complianceData.executive_summary ||
-              orchestratorResult.workflow_summary ||
-              '',
-            compliance: {
-              us_score: typeof us_score === 'number' && us_score >= 0 && us_score <= 100 ? Math.round(us_score) : 75,
-              india_score: typeof india_score === 'number' && india_score >= 0 && india_score <= 100 ? Math.round(india_score) : 80,
-              critical_issues: complianceData.critical_issues || [],
-              key_recommendations: complianceData.key_recommendations || [],
-            },
-            workflow_summary: orchestratorResult.workflow_summary || '',
-          }
-
-          setGeneratedPolicy(policyData)
-          setStep('review')
-        } catch (parseErr) {
-          throw new Error(
-            `Failed to parse policy data: ${parseErr instanceof Error ? parseErr.message : 'Unknown error'}`
-          )
-        }
-      } else if (data.error) {
-        throw new Error(data.error)
+      // Try to find the result in common locations
+      if (data.result?.policy_document) {
+        result = data.result
+      } else if (data.response?.policy_document) {
+        result = data.response
+      } else if (data.policy_document) {
+        result = data
+      } else if (data.result) {
+        result = data.result
+      } else if (data.response) {
+        result = data.response
       } else {
-        throw new Error('Failed to generate policy - invalid response format')
+        result = data
+      }
+
+      // Ensure we have a valid result
+      if (!result || typeof result !== 'object') {
+        throw new Error('No valid policy data found in response')
+      }
+
+      try {
+        // Extract policy document
+        const policyDoc = result.policy_document || result
+
+        if (!policyDoc || typeof policyDoc !== 'object') {
+          throw new Error('Invalid policy document structure')
+        }
+
+        // Get title
+        const title = policyDoc.title || topic || 'Untitled Policy'
+
+        // Extract and normalize sections
+        let sections: string[] = []
+        if (policyDoc.sections) {
+          if (Array.isArray(policyDoc.sections)) {
+            sections = policyDoc.sections
+              .map((s: any) => {
+                if (typeof s === 'string') return s.trim()
+                if (typeof s === 'object') return JSON.stringify(s)
+                return String(s)
+              })
+              .filter((s: string) => s && s.length > 0)
+          } else if (typeof policyDoc.sections === 'string') {
+            sections = [policyDoc.sections.trim()]
+          }
+        }
+
+        // Fallback if no sections
+        if (sections.length === 0) {
+          sections = ['Policy has been generated successfully. Review the compliance analysis below for detailed findings.']
+        }
+
+        // Extract compliance analysis
+        const compliance = result.compliance_analysis || result.compliance || {}
+
+        // Get compliance scores with validation
+        let us_score = 75
+        let india_score = 80
+
+        if (compliance.us_score !== undefined && compliance.us_score !== null) {
+          const val = Number(compliance.us_score)
+          if (!isNaN(val) && val >= 0 && val <= 100) {
+            us_score = Math.round(val)
+          }
+        } else if (compliance.us_compliance_score !== undefined && compliance.us_compliance_score !== null) {
+          const val = Number(compliance.us_compliance_score)
+          if (!isNaN(val) && val >= 0 && val <= 100) {
+            us_score = Math.round(val)
+          }
+        }
+
+        if (compliance.india_score !== undefined && compliance.india_score !== null) {
+          const val = Number(compliance.india_score)
+          if (!isNaN(val) && val >= 0 && val <= 100) {
+            india_score = Math.round(val)
+          }
+        } else if (compliance.india_compliance_score !== undefined && compliance.india_compliance_score !== null) {
+          const val = Number(compliance.india_compliance_score)
+          if (!isNaN(val) && val >= 0 && val <= 100) {
+            india_score = Math.round(val)
+          }
+        }
+
+        // Extract arrays with defaults
+        const critical_issues = Array.isArray(compliance.critical_issues) ? compliance.critical_issues : []
+        const key_recommendations = Array.isArray(compliance.key_recommendations) ? compliance.key_recommendations : []
+
+        // Build final policy data
+        const policyData = {
+          title,
+          sections,
+          summary: policyDoc.summary || compliance.executive_summary || '',
+          compliance: {
+            us_score,
+            india_score,
+            critical_issues,
+            key_recommendations,
+          },
+          workflow_summary: result.workflow_summary || '',
+        }
+
+        setGeneratedPolicy(policyData)
+        setStep('review')
+      } catch (parseErr) {
+        const errMsg = parseErr instanceof Error ? parseErr.message : 'Unknown parsing error'
+        console.error('Parse error details:', parseErr)
+        throw new Error(`Failed to process policy: ${errMsg}`)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred'
+      console.error('Policy generation error:', errorMessage, err)
+      setError(errorMessage)
       setStep('input')
     } finally {
       setLoading(false)
@@ -580,11 +615,23 @@ Requirements: ${requirements}`
           {/* Preview Panel */}
           <div>
             <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg border border-slate-200 p-6 h-full flex flex-col items-center justify-center text-center sticky top-24">
-              <FileText className="h-12 w-12 text-slate-400 mb-4" />
-              <p className="text-slate-600 font-medium">Policy Preview</p>
-              <p className="text-slate-500 text-sm mt-2">
-                Your generated policy will appear here
-              </p>
+              {loading ? (
+                <>
+                  <Loader2 className="h-12 w-12 text-blue-600 mb-4 animate-spin" />
+                  <p className="text-slate-600 font-medium">Generating Policy...</p>
+                  <p className="text-slate-500 text-sm mt-2">
+                    Creating your policy and analyzing compliance
+                  </p>
+                </>
+              ) : (
+                <>
+                  <FileText className="h-12 w-12 text-slate-400 mb-4" />
+                  <p className="text-slate-600 font-medium">Policy Preview</p>
+                  <p className="text-slate-500 text-sm mt-2">
+                    Your generated policy will appear here
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>
