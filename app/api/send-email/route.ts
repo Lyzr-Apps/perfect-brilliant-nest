@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import nodemailer from 'nodemailer'
 
 /**
  * POST /api/send-email
- * Sends policy summary via email using Resend service
- * or configured email provider
+ * Sends policy summary via email using AWS SES SMTP
  *
  * @param {string} email - Recipient email address
  * @param {string} policyTitle - Title of the policy
@@ -40,14 +40,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if email service is configured
-    const resendApiKey = process.env.RESEND_API_KEY
-    const sendgridApiKey = process.env.SENDGRID_API_KEY
-    const emailProvider = process.env.EMAIL_PROVIDER || 'resend'
+    // Check if SMTP credentials are configured
+    const smtpHost = process.env.SMTP_HOST
+    const smtpPort = process.env.SMTP_PORT
+    const smtpUsername = process.env.SMTP_USERNAME
+    const smtpPassword = process.env.SMTP_PASSWORD
+    const sesEmail = process.env.SES_SENDER_EMAIL
 
-    // If no email provider configured, return success but skip sending
-    if (!resendApiKey && !sendgridApiKey) {
-      console.warn('No email service configured (RESEND_API_KEY or SENDGRID_API_KEY). Email feature disabled.')
+    // If no SMTP provider configured, return success but skip sending
+    if (!smtpHost || !smtpPort || !smtpUsername || !smtpPassword || !sesEmail) {
+      console.warn('No SMTP service configured (SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, SES_SENDER_EMAIL required). Email feature disabled.')
       return NextResponse.json(
         {
           success: true,
@@ -156,77 +158,32 @@ export async function POST(request: NextRequest) {
     let emailSent = false
     let messageId = null
 
-    // Use Resend if available
-    if (resendApiKey && emailProvider === 'resend') {
-      try {
-        const response = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${resendApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: 'Policy Manager <noreply@policymanager.com>',
-            to: email,
-            subject: `Policy Document: ${policyTitle}`,
-            html: htmlContent,
-          }),
-        })
+    // Create nodemailer transporter with AWS SES SMTP
+    try {
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: parseInt(smtpPort as string, 10),
+        secure: true, // TLS
+        auth: {
+          user: smtpUsername,
+          pass: smtpPassword,
+        },
+      })
 
-        if (response.ok) {
-          const data = await response.json()
-          messageId = data.id
-          emailSent = true
-          console.log('Email sent via Resend:', messageId)
-        } else {
-          const errorData = await response.text()
-          console.error('Resend API error:', errorData)
-        }
-      } catch (error) {
-        console.error('Error sending via Resend:', error)
+      // Send email
+      const mailOptions = {
+        from: sesEmail,
+        to: email,
+        subject: `Policy Document: ${policyTitle}`,
+        html: htmlContent,
       }
-    }
 
-    // Fallback: Use SendGrid if Resend fails or not configured
-    if (!emailSent && sendgridApiKey) {
-      try {
-        const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${sendgridApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            personalizations: [
-              {
-                to: [{ email }],
-                subject: `Policy Document: ${policyTitle}`,
-              },
-            ],
-            from: {
-              email: 'noreply@policymanager.com',
-              name: 'Policy Manager',
-            },
-            content: [
-              {
-                type: 'text/html',
-                value: htmlContent,
-              },
-            ],
-          }),
-        })
-
-        if (response.ok || response.status === 202) {
-          emailSent = true
-          messageId = `sendgrid-${Date.now()}`
-          console.log('Email sent via SendGrid')
-        } else {
-          const errorData = await response.text()
-          console.error('SendGrid API error:', errorData)
-        }
-      } catch (error) {
-        console.error('Error sending via SendGrid:', error)
-      }
+      const info = await transporter.sendMail(mailOptions)
+      messageId = info.messageId
+      emailSent = true
+      console.log('Email sent via AWS SES SMTP:', messageId)
+    } catch (error) {
+      console.error('Error sending via AWS SES SMTP:', error)
     }
 
     // Return response
