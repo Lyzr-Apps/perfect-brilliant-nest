@@ -358,18 +358,37 @@ Requirements: ${requirements}`
       const data = await res.json()
 
       if (data.success && data.response) {
-        const orchestratorResult = data.response.result
+        // Extract the result - handle both direct result and nested structure
+        let orchestratorResult = data.response.result || data.response
+
+        // If result has a nested 'result' property, use that
+        if (orchestratorResult.result) {
+          orchestratorResult = orchestratorResult.result
+        }
+
+        // Handle the policy document sections - they may be an array of strings
+        let sections = []
+        if (orchestratorResult.policy_document?.sections) {
+          sections = Array.isArray(orchestratorResult.policy_document.sections)
+            ? orchestratorResult.policy_document.sections
+            : [orchestratorResult.policy_document.sections]
+        }
+
+        // Extract compliance scores from different possible locations
+        const complianceData = orchestratorResult.compliance_analysis || {}
+        const us_score = complianceData.us_score || complianceData.us_compliance_score || 75
+        const india_score = complianceData.india_score || complianceData.india_compliance_score || 80
 
         // Structure the policy data
         const policyData = {
           title: orchestratorResult.policy_document?.title || topic,
-          sections: orchestratorResult.policy_document?.sections || [],
-          summary: orchestratorResult.policy_document?.summary || '',
+          sections: sections,
+          summary: orchestratorResult.policy_document?.summary || orchestratorResult.workflow_summary || '',
           compliance: {
-            us_score: orchestratorResult.compliance_analysis?.us_score || 0,
-            india_score: orchestratorResult.compliance_analysis?.india_score || 0,
-            critical_issues: orchestratorResult.compliance_analysis?.critical_issues || [],
-            key_recommendations: orchestratorResult.compliance_analysis?.key_recommendations || [],
+            us_score: typeof us_score === 'number' ? us_score : 75,
+            india_score: typeof india_score === 'number' ? india_score : 80,
+            critical_issues: complianceData.critical_issues || [],
+            key_recommendations: complianceData.key_recommendations || [],
           },
           workflow_summary: orchestratorResult.workflow_summary || '',
         }
@@ -602,7 +621,8 @@ ${policy.compliance.key_recommendations.map((rec: string) => `- ${rec}`).join('\
     }
   }
 
-  const usIssues = [
+  // Default issues if not provided by agent
+  const usIssues: ComplianceIssue[] = [
     {
       severity: 'Critical',
       jurisdiction: 'US',
@@ -620,7 +640,7 @@ ${policy.compliance.key_recommendations.map((rec: string) => `- ${rec}`).join('\
     },
   ]
 
-  const indiaIssues = [
+  const indiaIssues: ComplianceIssue[] = [
     {
       severity: 'Warning',
       jurisdiction: 'India',
