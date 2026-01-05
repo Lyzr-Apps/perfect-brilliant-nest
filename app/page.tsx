@@ -794,6 +794,9 @@ function ComplianceAnalysisScreen({
 }) {
   const [activeTab, setActiveTab] = useState<'us' | 'india'>('us')
   const [exporting, setExporting] = useState(false)
+  const [sendingEmail, setSendingEmail] = useState(false)
+  const [emailInput, setEmailInput] = useState('')
+  const [emailMessage, setEmailMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const handleExport = async () => {
     setExporting(true)
@@ -829,6 +832,62 @@ ${policy.compliance.key_recommendations.map((rec: string) => `- ${rec}`).join('\
       URL.revokeObjectURL(url)
     } finally {
       setExporting(false)
+    }
+  }
+
+  const handleSendEmail = async () => {
+    if (!emailInput.trim()) {
+      setEmailMessage({ type: 'error', text: 'Please enter an email address' })
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(emailInput)) {
+      setEmailMessage({ type: 'error', text: 'Please enter a valid email address' })
+      return
+    }
+
+    setSendingEmail(true)
+    setEmailMessage(null)
+
+    try {
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: emailInput,
+          policyTitle: policy.title,
+          sections: policy.sections,
+          summary: policy.summary,
+          compliance: policy.compliance,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok && data.success) {
+        setEmailMessage({
+          type: 'success',
+          text: data.email_sent
+            ? `Policy sent to ${emailInput} successfully`
+            : 'Policy generated successfully (email service unavailable)',
+        })
+        setEmailInput('')
+        setTimeout(() => setEmailMessage(null), 5000)
+      } else {
+        setEmailMessage({
+          type: 'error',
+          text: data.error || 'Failed to send email',
+        })
+      }
+    } catch (error) {
+      setEmailMessage({
+        type: 'error',
+        text: 'Error sending email. Please try again.',
+      })
+      console.error('Email sending error:', error)
+    } finally {
+      setSendingEmail(false)
     }
   }
 
