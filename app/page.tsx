@@ -325,6 +325,7 @@ function PolicyGeneratorScreen({ onBack, onPolicyCreated }: { onBack: () => void
   const [topic, setTopic] = useState('')
   const [scope, setScope] = useState('Company-wide')
   const [requirements, setRequirements] = useState('')
+  const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [generatedPolicy, setGeneratedPolicy] = useState<any>(null)
@@ -336,6 +337,17 @@ function PolicyGeneratorScreen({ onBack, onPolicyCreated }: { onBack: () => void
       return
     }
 
+    if (!email.trim()) {
+      setError('Please provide an email address to receive the policy')
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      setError('Please provide a valid email address')
+      return
+    }
+
     setLoading(true)
     setError('')
     setStep('generating')
@@ -344,7 +356,16 @@ function PolicyGeneratorScreen({ onBack, onPolicyCreated }: { onBack: () => void
       const message = `Generate a comprehensive company policy for the following:
 Topic: ${topic}
 Scope: ${scope}
-Requirements: ${requirements}`
+Requirements: ${requirements}
+
+After generating the policy, please also send the policy summary and compliance analysis to this email address: ${email}
+
+Include in the email:
+- Policy title and sections
+- US and India compliance scores
+- Critical issues and key recommendations
+
+Email recipient: ${email}`
 
       const res = await fetch('/api/agent', {
         method: 'POST',
@@ -583,6 +604,33 @@ Requirements: ${requirements}`
         }
 
         setGeneratedPolicy(policyData)
+
+        // Send email with policy summary (as fallback if agent didn't send it)
+        try {
+          console.log('Sending policy to email:', email)
+          const emailRes = await fetch('/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email,
+              policyTitle: title,
+              sections,
+              summary: policyData.summary,
+              compliance: policyData.compliance,
+            }),
+          })
+
+          const emailData = await emailRes.json()
+          console.log('Email send response:', emailData)
+
+          if (!emailRes.ok || !emailData.success) {
+            console.warn('Email sending failed, but policy was generated:', emailData.error)
+          }
+        } catch (emailErr) {
+          console.warn('Error sending email notification:', emailErr)
+          // Don't fail the policy generation if email fails
+        }
+
         setStep('review')
       } catch (parseErr) {
         const errMsg = parseErr instanceof Error ? parseErr.message : 'Unknown parsing error'
@@ -654,6 +702,20 @@ Requirements: ${requirements}`
                   <option>Department</option>
                   <option>Company-wide</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-900 mb-2">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  placeholder="your.email@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
+                />
               </div>
 
               <div>
