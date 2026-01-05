@@ -1,0 +1,59 @@
+{
+  "agent_name": "Policy Orchestrator",
+  "agent_id": "695c4b206363be71980eedcb",
+  "agent_purpose": "manager",
+  "description": "Manager agent that coordinates policy drafting and compliance analysis workflow, aggregating results from both sub-agents into a comprehensive policy document with compliance report",
+  "response_schema": {
+    "status": "string (success|error)",
+    "result": {
+      "final_output": "object (aggregated result from sub-agents)",
+      "sub_agent_results": [
+        {
+          "agent_name": "string",
+          "status": "string",
+          "output": "object"
+        }
+      ],
+      "summary": "string",
+      "workflow_completed": "boolean"
+    },
+    "metadata": {
+      "agent_name": "string",
+      "timestamp": "string (ISO)",
+      "sub_agents_used": [
+        "string"
+      ]
+    }
+  },
+  "example_response": {
+    "status": "success",
+    "result": {
+      "final_output": {
+        "aggregated": "data from all sub-agents"
+      },
+      "sub_agent_results": [
+        {
+          "agent_name": "Sub-Agent 1",
+          "status": "success",
+          "output": {
+            "data": "result"
+          }
+        }
+      ],
+      "summary": "All sub-agents completed successfully",
+      "workflow_completed": true
+    },
+    "metadata": {
+      "agent_name": "Policy Orchestrator",
+      "timestamp": "2025-01-15T10:30:00Z",
+      "sub_agents_used": [
+        "Sub-Agent 1"
+      ]
+    }
+  },
+  "actual_test_response": {
+    "raw_text": "{\n  \"status\": \"success\",\n  \"result\": {\n    \"policy_document\": {\n      \"title\": \"Remote Work Policy\",\n      \"sections\": [\n        \"1. Purpose\nThis Remote Work Policy outlines the guidelines and expectations for employees of [Company Name] engaging in remote work arrangements. It is designed to support flexible work while ensuring productivity, collaboration, and alignment with the company\u2019s operational goals for both US and India teams.\",\n        \"2. Scope\nThis policy applies to all regular full-time and part-time employees of [Company Name] who are eligible for remote work in the United States and India.\",\n        \"3. Definitions\na) Remote Work: Working from a location other than the primary company office.\nb) Core Hours: Mandatory period when all team members are expected to be available online (10:00am\u20133:00pm in their local time zones).\nc) Stipend: A fixed sum of $500 granted for home office equipment setup.\nd) Deliverables: Specific work outputs that contribute to team and company objectives.\",\n        \"4. Flexible Work Hours\nEmployees are encouraged to work flexible hours to balance productivity and personal needs. However, all employees must be present and responsive during core hours, which are set at 10:00am to 3:00pm local time. Time outside of core hours can be scheduled at the employee\u2019s discretion, provided team commitments and deadlines are met.\",\n        \"5. Home Office Equipment Stipend\nEach eligible remote employee is entitled to a one-time home office equipment stipend of $500 (or local equivalent). The stipend is for purchasing ergonomic furniture, monitors, keyboards, and other approved equipment necessary for a productive work environment. Reimbursement follows the company\u2019s expense policy and requires submission of receipts.\",\n        \"6. Team Collaboration and Meetings\nMonthly team meetings are mandatory for all remote employees and will be scheduled to accommodate time zone differences between the US and India. Participation is required, with video enabled unless otherwise arranged. Additional meetings may be scheduled as needed for project collaboration.\",\n        \"7. Performance Evaluation\nEmployee performance will be evaluated primarily on the completion and quality of assigned deliverables. Managers will establish clear objectives and monitor progress through regular check-ins and documented outcomes, ensuring fair assessment regardless of physical location.\",\n        \"8. Communication Protocols\na) All distributed teams must use the approved company communication tools (e.g., Slack, Teams, email) for day-to-day collaboration.\nb) Response during core hours is expected within one hour for messages marked as urgent.\nc) Project discussions and key decisions must be documented in designated channels.\nd) Team leads are responsible for ensuring all team members are kept informed.\ne) Cross-time zone handoffs are to be clearly documented and communicated.\",\n        \"9. Compliance and Review\nAll remote work arrangements are subject to periodic review for compliance with this policy. The policy will be updated regularly to reflect industry best practices and local employment laws in the US and India.\",\n        \"10. Exceptions\nExceptions to this policy require prior approval from Human Resources and the employee\u2019s direct supervisor.\"\n      ],\n      \"summary\": \"This Remote Work Policy establishes clear guidelines for flexible working hours (core hours 10am-3pm local), provides a $500 home office equipment stipend, requires monthly team meetings, evaluates performance based on deliverables, and institutes communication protocols for distributed teams. The policy is designed to serve both US and India-based employees and is subject to regular review for legal compliance and best practices.\"\n    },\n    \"compliance_analysis\": {\n      \"us_score\": 85,\n      \"india_score\": 80,\n      \"critical_issues\": [\n        \"Potential misclassification of employees under wage and hour laws in the US due to flexible hours without explicit mention of compensation for all hours worked.\",\n        \"Risk of exceeding maximum working hours in India if mandatory meetings are not scheduled within prescribed limits.\",\n        \"Lack of provisions for workplace accommodations under the ADA for US employees.\",\n        \"No outlined grievance handling procedure for potential disputes for India operations.\"\n      ],\n      \"key_recommendations\": [\n        \"Clarify employee classification and ensure non-exempt employees are compensated for all hours worked, following FLSA.\",\n        \"Ensure meeting times and cumulative hours comply with India's Factories Act and do not exceed prescribed limits.\",\n        \"Add explicit language regarding workplace accommodations for remote employees with disabilities.\",\n        \"Incorporate a clear conflict/grievance resolution mechanism that meets Indian labor law standards.\"\n      ]\n    },\n    \"workflow_summary\": \"User requirements were received and routed to the Policy Drafter Agent to generate a comprehensive remote work policy draft aligning with specified guidelines for flexible hours, equipment stipends, mandatory meetings, deliverable-based performance evaluation, and communication protocols. The policy draft was then passed to the Compliance Analyzer Agent, which evaluated the policy against US and India labor laws, assigning compliance scores and providing detailed risk and recommendation feedback. The full workflow and coordination is documented, and both the policy document and compliance assessment are provided as persistent artifacts.\"\n  },\n  \"metadata\": {\n    \"agent_name\": \"Policy Orchestrator\",\n    \"timestamp\": \"2024-06-20T17:10:45Z\"\n  }\n}"
+  },
+  "test_timestamp": "2026-01-05T23:38:35.206750",
+  "test_passed": false
+}

@@ -1,0 +1,113 @@
+{
+  "agent_name": "Compliance Analyzer Agent",
+  "agent_id": "695c4b1a6363be71980eedca",
+  "agent_purpose": "specialist",
+  "description": "Analyzes drafted policies against US and India labor laws to identify compliance gaps, flag legal risks, and provide remediation recommendations",
+  "response_schema": {
+    "status": "string",
+    "result": {
+      "us_compliance_score": "number",
+      "india_compliance_score": "number",
+      "compliance_issues": [
+        {
+          "severity": "string",
+          "jurisdiction": "string",
+          "legal_requirement": "string",
+          "gap_description": "string",
+          "recommendation": "string"
+        }
+      ],
+      "executive_summary": "string",
+      "key_risks": [
+        "string"
+      ]
+    },
+    "metadata": {
+      "agent_name": "string",
+      "timestamp": "string"
+    }
+  },
+  "example_response": {
+    "status": "success",
+    "result": {
+      "us_compliance_score": 70,
+      "india_compliance_score": 80,
+      "compliance_issues": [
+        {
+          "severity": "Critical",
+          "jurisdiction": "US",
+          "legal_requirement": "Americans with Disabilities Act (ADA)",
+          "gap_description": "The policy does not mention accommodations for employees with disabilities, violating ADA requirements for providing necessary adjustments for remote work.",
+          "recommendation": "Include a section in the policy that outlines the process for requesting ADA accommodations for remote work."
+        },
+        {
+          "severity": "Warning",
+          "jurisdiction": "US",
+          "legal_requirement": "Family and Medical Leave Act (FMLA)",
+          "gap_description": "The policy does not address FMLA implications, which may affect employees needing leave for family or medical reasons.",
+          "recommendation": "Clarify the FMLA rights of employees in the context of remote work and ensure the policy articulates the process for requesting leave."
+        },
+        {
+          "severity": "Warning",
+          "jurisdiction": "US",
+          "legal_requirement": "California, Texas, and New York Work-from-Home Regulations",
+          "gap_description": "The policy does not comply with state-specific regulations governing remote work, particularly around meal breaks, overtime, and reimbursement of expenses in those states.",
+          "recommendation": "Review and incorporate state-specific regulations into the policy to ensure compliance with all relevant state laws."
+        }
+      ],
+      "executive_summary": "The Remote Work Policy has several compliance gaps, particularly concerning ADA accommodations and FMLA implications. Additionally, it lacks adherence to state-specific work-from-home regulations for California, Texas, and New York. Addressing these issues is critical to mitigating legal risks.",
+      "key_risks": [
+        "Potential litigation from employees due to lack of ADA accommodations",
+        "FMLA violations leading to penalties",
+        "State law violations resulting in fines and compensation claims"
+      ]
+    },
+    "metadata": {
+      "agent_name": "Compliance Analyzer Agent",
+      "timestamp": "2023-10-05T12:00:00Z"
+    }
+  },
+  "is_actual_tested": true,
+  "actual_test_response": {
+    "status": "success",
+    "result": {
+      "us_compliance_score": 70,
+      "india_compliance_score": 80,
+      "compliance_issues": [
+        {
+          "severity": "Critical",
+          "jurisdiction": "US",
+          "legal_requirement": "Americans with Disabilities Act (ADA)",
+          "gap_description": "The policy does not mention accommodations for employees with disabilities, violating ADA requirements for providing necessary adjustments for remote work.",
+          "recommendation": "Include a section in the policy that outlines the process for requesting ADA accommodations for remote work."
+        },
+        {
+          "severity": "Warning",
+          "jurisdiction": "US",
+          "legal_requirement": "Family and Medical Leave Act (FMLA)",
+          "gap_description": "The policy does not address FMLA implications, which may affect employees needing leave for family or medical reasons.",
+          "recommendation": "Clarify the FMLA rights of employees in the context of remote work and ensure the policy articulates the process for requesting leave."
+        },
+        {
+          "severity": "Warning",
+          "jurisdiction": "US",
+          "legal_requirement": "California, Texas, and New York Work-from-Home Regulations",
+          "gap_description": "The policy does not comply with state-specific regulations governing remote work, particularly around meal breaks, overtime, and reimbursement of expenses in those states.",
+          "recommendation": "Review and incorporate state-specific regulations into the policy to ensure compliance with all relevant state laws."
+        }
+      ],
+      "executive_summary": "The Remote Work Policy has several compliance gaps, particularly concerning ADA accommodations and FMLA implications. Additionally, it lacks adherence to state-specific work-from-home regulations for California, Texas, and New York. Addressing these issues is critical to mitigating legal risks.",
+      "key_risks": [
+        "Potential litigation from employees due to lack of ADA accommodations",
+        "FMLA violations leading to penalties",
+        "State law violations resulting in fines and compensation claims"
+      ]
+    },
+    "metadata": {
+      "agent_name": "Compliance Analyzer Agent",
+      "timestamp": "2023-10-05T12:00:00Z"
+    }
+  },
+  "test_timestamp": "2026-01-05T23:37:38.837363",
+  "test_passed": true
+}
