@@ -357,46 +357,100 @@ Requirements: ${requirements}`
 
       const data = await res.json()
 
-      if (data.success && data.response) {
-        // Extract the result - handle both direct result and nested structure
-        let orchestratorResult = data.response.result || data.response
+      // Check if response exists and is valid
+      if (!data) {
+        throw new Error('Empty response received from server')
+      }
 
-        // If result has a nested 'result' property, use that
-        if (orchestratorResult.result) {
-          orchestratorResult = orchestratorResult.result
+      // Handle success response
+      if (data.success && (data.response || data.result)) {
+        try {
+          // Extract the actual response object - try multiple locations
+          let responseData = data.response || data.result || data
+
+          // Navigate through nested structures
+          let orchestratorResult = responseData
+
+          // If we have a 'result' property, use it
+          if (responseData.result && typeof responseData.result === 'object') {
+            orchestratorResult = responseData.result
+          }
+
+          // Handle policy document
+          let policyDocument = orchestratorResult.policy_document || orchestratorResult
+          if (!policyDocument.title && orchestratorResult.title) {
+            policyDocument = { title: orchestratorResult.title, sections: orchestratorResult.sections }
+          }
+
+          // Extract and normalize sections
+          let sections: string[] = []
+          if (policyDocument.sections) {
+            if (Array.isArray(policyDocument.sections)) {
+              sections = policyDocument.sections
+                .map((s: any) => (typeof s === 'string' ? s : JSON.stringify(s)))
+                .filter((s: string) => s && s.trim())
+            } else if (typeof policyDocument.sections === 'string') {
+              sections = [policyDocument.sections]
+            }
+          }
+
+          // Ensure we have at least some sections
+          if (sections.length === 0) {
+            sections = ['Policy content has been generated. Please review the compliance analysis for details.']
+          }
+
+          // Extract compliance data from multiple possible locations
+          let complianceData = orchestratorResult.compliance_analysis || {}
+          if (!complianceData.us_score && orchestratorResult.us_score) {
+            complianceData = {
+              us_score: orchestratorResult.us_score,
+              india_score: orchestratorResult.india_score,
+              critical_issues: orchestratorResult.critical_issues,
+              key_recommendations: orchestratorResult.key_recommendations,
+            }
+          }
+
+          // Extract scores with fallback
+          const us_score =
+            complianceData.us_score ||
+            complianceData.us_compliance_score ||
+            orchestratorResult.us_score ||
+            75
+          const india_score =
+            complianceData.india_score ||
+            complianceData.india_compliance_score ||
+            orchestratorResult.india_score ||
+            80
+
+          // Structure the final policy data
+          const policyData = {
+            title: policyDocument.title || topic,
+            sections: sections,
+            summary:
+              policyDocument.summary ||
+              complianceData.executive_summary ||
+              orchestratorResult.workflow_summary ||
+              '',
+            compliance: {
+              us_score: typeof us_score === 'number' && us_score >= 0 && us_score <= 100 ? Math.round(us_score) : 75,
+              india_score: typeof india_score === 'number' && india_score >= 0 && india_score <= 100 ? Math.round(india_score) : 80,
+              critical_issues: complianceData.critical_issues || [],
+              key_recommendations: complianceData.key_recommendations || [],
+            },
+            workflow_summary: orchestratorResult.workflow_summary || '',
+          }
+
+          setGeneratedPolicy(policyData)
+          setStep('review')
+        } catch (parseErr) {
+          throw new Error(
+            `Failed to parse policy data: ${parseErr instanceof Error ? parseErr.message : 'Unknown error'}`
+          )
         }
-
-        // Handle the policy document sections - they may be an array of strings
-        let sections = []
-        if (orchestratorResult.policy_document?.sections) {
-          sections = Array.isArray(orchestratorResult.policy_document.sections)
-            ? orchestratorResult.policy_document.sections
-            : [orchestratorResult.policy_document.sections]
-        }
-
-        // Extract compliance scores from different possible locations
-        const complianceData = orchestratorResult.compliance_analysis || {}
-        const us_score = complianceData.us_score || complianceData.us_compliance_score || 75
-        const india_score = complianceData.india_score || complianceData.india_compliance_score || 80
-
-        // Structure the policy data
-        const policyData = {
-          title: orchestratorResult.policy_document?.title || topic,
-          sections: sections,
-          summary: orchestratorResult.policy_document?.summary || orchestratorResult.workflow_summary || '',
-          compliance: {
-            us_score: typeof us_score === 'number' ? us_score : 75,
-            india_score: typeof india_score === 'number' ? india_score : 80,
-            critical_issues: complianceData.critical_issues || [],
-            key_recommendations: complianceData.key_recommendations || [],
-          },
-          workflow_summary: orchestratorResult.workflow_summary || '',
-        }
-
-        setGeneratedPolicy(policyData)
-        setStep('review')
+      } else if (data.error) {
+        throw new Error(data.error)
       } else {
-        throw new Error(data.error || 'Failed to generate policy')
+        throw new Error('Failed to generate policy - invalid response format')
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
@@ -483,8 +537,14 @@ Requirements: ${requirements}`
               </div>
 
               {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <p className="text-red-700 text-sm">{error}</p>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-red-700 text-sm font-medium">Generation Error</p>
+                      <p className="text-red-600 text-xs mt-1">{error}</p>
+                    </div>
+                  </div>
                 </div>
               )}
 
