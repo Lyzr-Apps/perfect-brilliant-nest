@@ -361,12 +361,100 @@ Requirements: ${requirements}`
       }
 
       let data: any
+      const responseText = await res.text()
+
       try {
-        data = await res.json()
+        // Try to parse as JSON first
+        if (responseText && responseText.trim()) {
+          data = JSON.parse(responseText)
+        } else {
+          throw new Error('Empty response body')
+        }
       } catch (jsonErr) {
-        const text = await res.text()
-        console.error('JSON parsing failed. Raw response:', text)
-        throw new Error(`Failed to parse server response: ${jsonErr instanceof Error ? jsonErr.message : 'Invalid JSON'}`)
+        console.error('Initial JSON parsing failed')
+        console.error('Raw response preview:', responseText.substring(0, 500))
+        console.error('Parse error:', jsonErr)
+
+        // Try multiple recovery strategies
+        let recovered = false
+        let fixedText = responseText
+
+        // Strategy 1: Fix literal backslash-newlines (\ followed by actual newline in string content)
+        // This handles cases where the response contains line continuation in the middle of JSON strings
+        try {
+          fixedText = responseText.replace(/\\\r?\n/g, ' ')
+          data = JSON.parse(fixedText)
+          recovered = true
+          console.log('Strategy 1: Successfully fixed literal backslash-newlines')
+        } catch (e) {
+          console.error('Strategy 1 failed:', e)
+        }
+
+        // Strategy 2: Remove unescaped newlines and tabs inside string values
+        // This handles formatting characters that break JSON validity
+        if (!recovered) {
+          try {
+            fixedText = responseText
+              // First, protect escaped quotes and backslashes
+              .replace(/\\"/g, '___ESCAPED_QUOTE___')
+              .replace(/\\\\/g, '___ESCAPED_BACKSLASH___')
+              // Remove actual newlines and tabs that appear in strings
+              .replace(/\n/g, ' ')
+              .replace(/\r/g, '')
+              .replace(/\t/g, ' ')
+              // Restore protected characters
+              .replace(/___ESCAPED_QUOTE___/g, '\\"')
+              .replace(/___ESCAPED_BACKSLASH___/g, '\\\\')
+
+            data = JSON.parse(fixedText)
+            recovered = true
+            console.log('Strategy 2: Successfully parsed with whitespace normalization')
+          } catch (e) {
+            console.error('Strategy 2 failed:', e)
+          }
+        }
+
+        // Strategy 3: Extract and reconstruct JSON object
+        if (!recovered) {
+          try {
+            let braceCount = 0
+            let jsonStart = -1
+            let jsonEnd = -1
+
+            for (let i = 0; i < responseText.length; i++) {
+              if (responseText[i] === '{') {
+                if (jsonStart === -1) jsonStart = i
+                braceCount++
+              } else if (responseText[i] === '}') {
+                braceCount--
+                if (braceCount === 0 && jsonStart !== -1) {
+                  jsonEnd = i + 1
+                  break
+                }
+              }
+            }
+
+            if (jsonStart !== -1 && jsonEnd !== -1) {
+              let extractedJson = responseText.substring(jsonStart, jsonEnd)
+              // Apply whitespace fixes to extracted JSON
+              extractedJson = extractedJson
+                .replace(/\\\r?\n/g, ' ')
+                .replace(/\n/g, ' ')
+                .replace(/\r/g, '')
+
+              data = JSON.parse(extractedJson)
+              recovered = true
+              console.log('Strategy 3: Successfully extracted and fixed JSON object')
+            }
+          } catch (e) {
+            console.error('Strategy 3 failed:', e)
+          }
+        }
+
+        // If all strategies failed, throw error
+        if (!recovered) {
+          throw new Error(`Failed to parse server response: The response contains invalid JSON that cannot be automatically fixed. Please check the browser console for the raw response details.`)
+        }
       }
 
       // Check if response exists and is valid
@@ -374,23 +462,39 @@ Requirements: ${requirements}`
         throw new Error('Empty response received from server')
       }
 
+      console.log('Successfully parsed response. Data structure:', {
+        hasResult: !!data.result,
+        hasResponse: !!data.response,
+        hasPolicyDocument: !!data.policy_document,
+        resultKeys: data.result ? Object.keys(data.result) : [],
+        responseKeys: data.response ? Object.keys(data.response) : [],
+      })
+
       // Extract policy data from response - handle various formats
       let result: any = null
 
       // Try to find the result in common locations
       if (data.result?.policy_document) {
         result = data.result
+        console.log('Found policy data at: data.result.policy_document')
       } else if (data.response?.policy_document) {
         result = data.response
+        console.log('Found policy data at: data.response.policy_document')
       } else if (data.policy_document) {
         result = data
+        console.log('Found policy data at: data.policy_document')
       } else if (data.result) {
         result = data.result
+        console.log('Found result at: data.result')
       } else if (data.response) {
         result = data.response
+        console.log('Found result at: data.response')
       } else {
         result = data
+        console.log('Using data as result')
       }
+
+      console.log('Extracted result object:', result)
 
       // Ensure we have a valid result
       if (!result || typeof result !== 'object') {
