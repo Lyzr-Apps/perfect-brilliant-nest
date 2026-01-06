@@ -21,12 +21,9 @@ const nextConfig = {
 
   // Enable experimental features if needed
   experimental: {
-    // Add experimental features here if needed
+    // Dynamic rendering to prevent hook issues in client components during build
+    dynamicIO: true,
   },
-
-  // Disable error page static generation to prevent build errors
-  output: 'standalone',
-  staticPageGenerationTimeout: 0,
 
   // Configure headers for security and iframe embedding
   async headers() {
