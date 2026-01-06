@@ -24,6 +24,10 @@ const nextConfig = {
     // Add experimental features here if needed
   },
 
+  // Disable error page static generation to prevent build errors
+  output: 'standalone',
+  staticPageGenerationTimeout: 0,
+
   // Configure headers for security and iframe embedding
   async headers() {
     return [
