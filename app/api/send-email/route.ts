@@ -160,15 +160,27 @@ export async function POST(request: NextRequest) {
 
     // Create nodemailer transporter with AWS SES SMTP
     try {
+      const port = parseInt(smtpPort as string, 10)
+      console.log(`Attempting to connect to SMTP: ${smtpHost}:${port}`)
+
       const transporter = nodemailer.createTransport({
         host: smtpHost,
-        port: parseInt(smtpPort as string, 10),
-        secure: true, // TLS
+        port: port,
+        secure: port === 465, // Use TLS for 587, SSL for 465
+        requireTLS: port === 587, // Require TLS upgrade for port 587
         auth: {
           user: smtpUsername,
           pass: smtpPassword,
         },
+        tls: {
+          rejectUnauthorized: false, // Allow self-signed certs from AWS
+        },
       })
+
+      // Verify connection before sending
+      console.log('Verifying SMTP connection...')
+      await transporter.verify()
+      console.log('SMTP connection verified successfully')
 
       // Send email
       const mailOptions = {
@@ -178,12 +190,15 @@ export async function POST(request: NextRequest) {
         html: htmlContent,
       }
 
+      console.log(`Sending email to ${email}...`)
       const info = await transporter.sendMail(mailOptions)
       messageId = info.messageId
       emailSent = true
       console.log('Email sent via AWS SES SMTP:', messageId)
     } catch (error) {
-      console.error('Error sending via AWS SES SMTP:', error)
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      console.error('Error sending via AWS SES SMTP:', errorMsg)
+      console.error('Full error:', error)
     }
 
     // Return response
