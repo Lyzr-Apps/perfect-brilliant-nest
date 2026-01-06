@@ -640,6 +640,33 @@ Email recipient: ${email}`
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred'
       console.error('Policy generation error:', errorMessage, err)
+
+      // Send default email even if policy generation fails
+      try {
+        console.log('Policy generation failed, sending default email to:', email)
+        const defaultEmailRes = await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            policyTitle: 'Policy Generation - Processing',
+            sections: ['Your policy is being processed. Please check back shortly for the complete policy document.'],
+            summary: 'Your policy generation request has been received and is being processed.',
+            compliance: {
+              us_score: 0,
+              india_score: 0,
+              critical_issues: [],
+              key_recommendations: ['Please try generating the policy again or contact support if the issue persists.'],
+            },
+          }),
+        })
+
+        const defaultEmailData = await defaultEmailRes.json()
+        console.log('Default email sent:', defaultEmailData)
+      } catch (defaultEmailErr) {
+        console.warn('Could not send default email on error:', defaultEmailErr)
+      }
+
       setError(errorMessage)
       setStep('input')
     } finally {
